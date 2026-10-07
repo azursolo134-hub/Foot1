@@ -44,14 +44,14 @@ h1 { font-family: var(--font-display); font-size: 2.3rem; font-weight: 900; marg
 .api-panel.ok { box-shadow: inset 3px 0 0 var(--electric), 0 0 20px rgba(0,255,136,0.1); }
 .api-key-input { width: 100%; padding: 0.8rem 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--night-2); color: var(--ink); font-family: var(--font-mono); font-size: 0.82rem; margin-bottom: 0.5rem; }
 .api-paste-btn { width: 100%; padding: 0.9rem; border-radius: var(--radius); border: 1px solid var(--electric); background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,255,136,0.1)); color: var(--electric-soft); font-weight: 800; cursor: pointer; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.82rem; }
-.api-save-btn { width: 100%; padding: 0.8rem; border-radius: var(--radius); border: 1px solid var(--cyan-deep); background: linear-gradient(135deg, rgba(0,224,255,0.15), rgba(0,224,255,0.05)); color: var(--cyan-soft); font-weight: 700; cursor: pointer; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.78rem; }
+.api-save-btn { width: 100%; padding: 0.8rem; border-radius: var(--radius); border: 1px solid var(--cyan-deep); background: linear-gradient(135deg, rgba(0,224,255,0.15), rgba(0,224,255:,0.05)); color: var(--cyan var-soft); font-weight: (--700; cursor: pointer; marginradius-bottom: 0.5rem;); text-transform: uppercase; letter margin-spacing: 0.15em; font-size: 0.78rem; }
 .api-status-line { font-size: 0.75rem; padding: 0.5rem 0.8rem; border-radius: var(--radius); background: var(--night-2); color: var(--ink-dim); display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border-soft); }
 .api-status-line.ok { color: var(--electric); background: rgba(0,255,136,0.06); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
 .api-status-line.ok .status-dot { background: var(--electric); box-shadow: 0 0 8px var(--electric); }
 .api-hint { font-size: 0.7rem; color: var(--ink-dim); margin-top: 0.4rem; }
 .api-hint a { color: var(--cyan-soft); text-decoration: none; }
-.wake-status { font-size: 0.7rem; padding: 0.5rem 0.7rem; border-radius: var(--radius); margin-top: 0.4rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,224,255,0.06); color: var(--cyan-soft); border: 1px solid var(--cyan-deep); flex-wrap: wrap; gap: 0.4rem; }
+.wake-status { font-size: 0.7rem; padding: 0.5rem 0.7rem; border-radius-top: 0.4rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,224,255,0.06); color: var(--cyan-soft); border: 1px solid var(--cyan-deep); flex-wrap: wrap; gap: 0.4rem; }
 .wake-status.active { background: rgba(0,255,136,0.08); color: var(--electric); }
 .wake-status button { background: transparent; border: 1px solid currentColor; color: inherit; padding: 0.25rem 0.6rem; border-radius: var(--radius); font-size: 0.65rem; cursor: pointer; }
 
@@ -271,7 +271,7 @@ const MODEL_TEXT = 'agnes-2.5-flash';
 const MODEL_IMAGE = 'agnes-image-2.1-flash';
 const IMAGE_PARALLEL = 3;
 const IMAGE_INTERVAL_MS = 3400;
-const API_KEY_STORAGE = 'agnes_api_key';  // ⚠️ MÊME CLÉ QUE COULISSES REEL
+const API_KEY_STORAGE = 'agnes_api_key';
 const WAKE_LOCK_PREF = 'futurfoot_wakelock';
 const BATCH_SIZE = 5;
 const SECONDS_PER_IMAGE = 2;
@@ -324,8 +324,7 @@ function debugLog(level, category, message, data) {
   const time = new Date().toLocaleTimeString('fr-FR', { hour12: false });
   const entry = document.createElement('div');
   entry.className = 'debug-entry ' + level;
-  let html = '<span class="debug-time">' + time + '</span><span class="debug-cat">[' + esc(category) + ']</span><span>' + esc(message) + '</span>';
-  entry.innerHTML = html;
+  entry.innerHTML = '<span class="debug-time">' + time + '</span><span class="debug-cat">[' + esc(category) + ']</span><span>' + esc(message) + '</span>';
   body.appendChild(entry);
   debugEntries.push({ time, level, category, message });
   if (debugEntries.length > 500) debugEntries.shift();
@@ -435,7 +434,6 @@ function updateApiPanel() {
   updateGenerateBtn();
 }
 
-// ⚠️ CORRECTION IMPORTANTE : plus besoin d'image de référence
 function updateGenerateBtn() {
   const btn = document.getElementById('generate-btn');
   if (!btn) return;
@@ -537,7 +535,7 @@ function buildImagePrompt(index, text) {
   const vibe = VIBES.find(v => v.id === state.selectedVibe) || VIBES[0];
   const theme = state.customTheme || (THEMES.find(t => t.id === state.selectedTheme) || THEMES[0]).prompt;
   const concepts = [
-    'surveillance-free cinematic shot of a striker scoring a spectacular volley, ball exploding into light particles as it hits the net',
+    'cinematic shot of a striker scoring a spectacular volley, ball exploding into light particles as it hits the net',
     'footballer performing a bicycle kick under neon stadium lights, energy trails following the ball',
     'goalkeeper diving in extreme slow motion, fingertips reaching for a glowing ball',
     'player celebrating a goal in front of a holographic scoreboard, arms raised, energy particles around',
@@ -559,7 +557,8 @@ function buildImagePrompt(index, text) {
 }
 
 async function generateImage(prompt) {
-  const body = { model: MODEL_IMAGE, prompt: prompt, n: 1, size: '1024x1792', response_format: 'url' };
+  // ⚠️ CORRECTION : b64_json au lieu de url (résout le CORS pour la vidéo)
+  const body = { model: MODEL_IMAGE, prompt: prompt, n: 1, size: '1024x1792', response_format: 'b64_json' };
   const res = await apiFetch(API_BASE + '/images/generations', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + getApiKey(), 'Content-Type': 'application/json' },
@@ -569,13 +568,15 @@ async function generateImage(prompt) {
   const data = await res.json();
   const item = data.data && data.data[0];
   if (!item) throw new Error('Pas de donnée');
-  return item.url || ('data:image/png;base64,' + item.b64_json);
+  // ⚠️ CORRECTION : priorité au b64_json
+  if (item.b64_json) return 'data:image/png;base64,' + item.b64_json;
+  if (item.url) return item.url;
+  throw new Error('Format inconnu');
 }
 
 async function addTextToImage(imageUrl, text) {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -649,7 +650,7 @@ async function createVideoFromImages(imageUrls) {
       };
       const loadedImages = await Promise.all(imageUrls.map(url => new Promise((res, rej) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        // ⚠️ CORRECTION : plus besoin de crossOrigin car les images sont en base64
         img.onload = () => res(img);
         img.onerror = () => rej(new Error('Image load failed'));
         img.src = url;
@@ -840,6 +841,7 @@ async function runBatch() {
           const result = await createVideoFromImages(valid);
           state.videos.push(result);
           renderVideosGrid();
+          debugLog('success', 'VIDÉO', 'Vidéo créée');
         } catch (e) { debugLog('error', 'VIDÉO', e.message); }
       }
     }
@@ -929,8 +931,8 @@ function stopGeneration() {
   updateApiPanel();
   updateWakeStatus();
 
-  debugLog('success', 'INIT', 'Futur Foot V1 prêt');
-  debugLog('info', 'INIT', 'Bouton actif dès que la clé est enregistrée');
+  debugLog('success', 'INIT', 'Futur Foot V2 prêt');
+  debugLog('info', 'INIT', 'Images en base64 · Vidéo fonctionnelle');
 })();
 </script>
 </body>
