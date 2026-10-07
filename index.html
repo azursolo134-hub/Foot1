@@ -356,4 +356,582 @@ function showToast(message, type = 'success', duration = 2500) {
   toast.classList.remove('visible', 'success', 'error', 'warn');
   void toast.offsetWidth;
   toast.textContent = message;
-  toast
+  toast.classList.add(type);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toast.classList.remove('visible'), duration);
+}
+
+let wakeLockSentinel = null, wakeLockEnabled = false, canvasStream = null, canvasInterval = null;
+function isWakeLockSupported() { return 'wakeLock' in navigator && typeof navigator.wakeLock.request === 'function'; }
+async function requestWakeLockAPI() {
+  if (!isWakeLockSupported()) return false;
+  try { wakeLockSentinel = await navigator.wakeLock.request('screen'); wakeLockSentinel.addEventListener('release', () => { wakeLockSentinel = null; }); return true; } catch (e) { return false; }
+}
+async function releaseWakeLockAPI() { if (wakeLockSentinel) { try { await wakeLockSentinel.release(); } catch (e) {} wakeLockSentinel = null; } }
+function startCanvasStream() {
+  if (canvasStream) return true;
+  try {
+    const canvas = document.getElementById('noSleepCanvas'), video = document.getElementById('noSleepVideo');
+    if (!canvas || !video) return false;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 2, 2);
+    canvasStream = canvas.captureStream(1);
+    let toggle = false;
+    canvasInterval = setInterval(() => { toggle = !toggle; ctx.fillStyle = toggle ? '#000' : '#010101'; ctx.fillRect(0, 0, 2, 2); }, 1000);
+    video.srcObject = canvasStream; video.muted = true; video.playsInline = true;
+    video.play().catch(() => {});
+    return true;
+  } catch (e) { return false; }
+}
+function stopCanvasStream() {
+  if (canvasInterval) { clearInterval(canvasInterval); canvasInterval = null; }
+  const video = document.getElementById('noSleepVideo');
+  if (video) { try { video.pause(); video.srcObject = null; } catch (e) {} }
+  if (canvasStream) { try { canvasStream.getTracks().forEach(t => t.stop()); } catch (e) {} canvasStream = null; }
+}
+async function activateWakeLock() {
+  let ok = false;
+  if (isWakeLockSupported()) ok = await requestWakeLockAPI();
+  if (!ok) ok = startCanvasStream();
+  return ok;
+}
+async function deactivateWakeLock() { await releaseWakeLockAPI(); stopCanvasStream(); }
+function updateWakeStatus() {
+  const el = document.getElementById('wake-status'), txt = document.getElementById('wake-status-text'), btn = document.getElementById('wake-toggle-btn');
+  if (!el || !txt || !btn) return;
+  el.classList.remove('active');
+  const active = wakeLockSentinel !== null || canvasStream !== null;
+  if (wakeLockEnabled && active) { el.classList.add('active'); txt.textContent = '✅ Écran allumé'; btn.textContent = 'Désactiver'; }
+  else { txt.textContent = '💤 Veille automatique'; btn.textContent = 'Garder l\'écran allumé'; }
+}
+async function toggleWakeLock() {
+  if (wakeLockEnabled) { wakeLockEnabled = false; await deactivateWakeLock(); localStorage.setItem(WAKE_LOCK_PREF, '0'); showToast('Veille auto', 'warn'); }
+  else { wakeLockEnabled = true; const ok = await activateWakeLock(); localStorage.setItem(WAKE_LOCK_PREF, '1'); showToast(ok ? 'Écran allumé' : 'Non supporté', ok ? 'success' : 'warn'); }
+  updateWakeStatus();
+}
+document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && wakeLockEnabled) { await activateWakeLock(); updateWakeStatus(); } });
+async function ensureWakeLockActive() { if (!wakeLockEnabled) return; if (wakeLockSentinel === null && canvasStream === null) { await activateWakeLock(); updateWakeStatus(); } }
+
+function getApiKey() { try { return (localStorage.getItem(API_KEY_STORAGE) || '').trim(); } catch (e) { return ''; } }
+
+function saveApiKey() {
+  const input = document.getElementById('api-key-input');
+  if (!input) return;
+  const key = input.value.trim();
+  if (!key) { localStorage.removeItem(API_KEY_STORAGE); updateApiPanel(); showToast('Clé supprimée', 'warn'); return; }
+  localStorage.setItem(API_KEY_STORAGE, key);
+  updateApiPanel(); showToast('Clé enregistrée ✓', 'success');
+  debugLog('success', 'API', 'Clé : ' + key.slice(0, 8) + '…' + key.slice(-4));
+}
+
+function updateApiPanel() {
+  const panel = document.getElementById('api-panel'), input = document.getElementById('api-key-input'),
+        statusLine = document.getElementById('api-status-line'), statusText = document.getElementById('api-status-text');
+  const key = getApiKey();
+  if (!panel || !input) return;
+  if (key) { panel.classList.add('ok'); statusLine.classList.add('ok'); statusText.textContent = 'Clé active · ' + key.slice(0, 8) + '…' + key.slice(-4); input.value = key; }
+  else { panel.classList.remove('ok'); statusLine.classList.remove('ok'); statusText.textContent = 'Aucune clé API enregistrée'; input.value = ''; }
+  updateGenerateBtn();
+}
+
+// ⚠️ CORRECTION IMPORTANTE : plus besoin d'image de référence
+function updateGenerateBtn() {
+  const btn = document.getElementById('generate-btn');
+  if (!btn) return;
+  const hasKey = !!getApiKey();
+  const canRun = hasKey && !state.isRunning;
+  btn.disabled = !canRun;
+  if (state.isRunning) btn.textContent = '⚽ Création en cours…';
+  else if (!hasKey) btn.textContent = '⚽ Ajoutez votre clé API';
+  else btn.textContent = '⚽ Lancer · 5 images + 1 vidéo';
+}
+
+function setStatus(text) {
+  const bar = document.getElementById('status-bar'), txt = document.getElementById('status-text');
+  if (!bar || !txt) return;
+  if (text) { bar.classList.add('visible'); txt.textContent = text; } else bar.classList.remove('visible');
+}
+
+async function apiFetch(url, options = {}, label = 'API') {
+  for (let attempt = 0; attempt < 7; attempt++) {
+    if (state.stopRequested) throw new Error('Arrêt demandé');
+    try {
+      const res = await fetch(url, options);
+      if (res.status === 429) {
+        const wait = [10, 20, 35, 50, 75, 100, 150][Math.min(attempt, 6)];
+        debugLog('warn', 'RATELIMIT', '429 — attente ' + wait + 's');
+        setStatus('L\'IA se prépare… (' + wait + 's)');
+        await sleep(wait * 1000); continue;
+      }
+      if (res.status === 503) {
+        const wait = [5, 10, 15, 20, 30, 45][Math.min(attempt, 5)];
+        debugLog('warn', 'SERVICE', '503 — attente ' + wait + 's');
+        setStatus('Le service se prépare… (' + wait + 's)');
+        await sleep(wait * 1000); continue;
+      }
+      return res;
+    } catch (e) {
+      if (e.message === 'Arrêt demandé') throw e;
+      const wait = [3, 5, 8, 12, 20, 30][Math.min(attempt, 5)];
+      debugLog('warn', 'NETWORK', e.message + ' — retry ' + wait + 's');
+      await sleep(wait * 1000);
+    }
+  }
+  return fetch(url, options);
+}
+
+async function generateTexts() {
+  const theme = state.customTheme || (THEMES.find(t => t.id === state.selectedTheme) || THEMES[0]).prompt;
+  const userPrompt = `Tu es un copywriter TikTok spécialisé dans le football spectaculaire.
+
+THÈME : ${theme}
+
+Génère 5 phrases courtes et percutantes sur ce thème.
+
+CONTRAINTES :
+- 5 à 12 mots par phrase
+- Ton épique, énergique, digne d'une légende du football
+- Utilise "tu" ou une phrase nominale
+- Commence parfois par "Et si..."
+
+FORMAT : Exactement 5 lignes. Une phrase par ligne. Pas de numérotation, pas de guillemets.
+
+THÈME : ${theme}`;
+
+  const body = {
+    model: MODEL_TEXT,
+    messages: [
+      { role: 'system', content: 'Tu génères des phrases courtes percutantes pour TikTok. Tu réponds UNIQUEMENT avec 5 lignes.' },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: 0.95,
+    max_tokens: 1000
+  };
+
+  debugLog('api', 'TEXTES', 'Génération sur : ' + theme.slice(0, 60));
+  setStatus('L\'IA écrit 5 textes…');
+
+  const res = await apiFetch(API_BASE + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + getApiKey(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }, 'Textes');
+
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (!content) throw new Error('Pas de contenu');
+
+  let lines = content.split('\n')
+    .map(l => l.trim())
+    .map(l => l.replace(/^["'\-•\d\.\)\s]+/, '').replace(/["']+$/, '').trim())
+    .filter(l => l.length > 3 && l.length < 150);
+
+  while (lines.length < 5) lines.push('Et si ce but changeait tout ?');
+  if (lines.length > 5) lines = lines.slice(0, 5);
+  return lines;
+}
+
+function buildImagePrompt(index, text) {
+  const vibe = VIBES.find(v => v.id === state.selectedVibe) || VIBES[0];
+  const theme = state.customTheme || (THEMES.find(t => t.id === state.selectedTheme) || THEMES[0]).prompt;
+  const concepts = [
+    'surveillance-free cinematic shot of a striker scoring a spectacular volley, ball exploding into light particles as it hits the net',
+    'footballer performing a bicycle kick under neon stadium lights, energy trails following the ball',
+    'goalkeeper diving in extreme slow motion, fingertips reaching for a glowing ball',
+    'player celebrating a goal in front of a holographic scoreboard, arms raised, energy particles around',
+    'stadium from above at night, millions of holographic spectators, single spotlight on the pitch'
+  ];
+  const concept = concepts[index % concepts.length];
+  const parts = [
+    'Generate ONE cinematic football image.',
+    'SCENE: ' + concept + '.',
+    'AESTHETIC: ' + vibe.prompt + '.',
+    'THEME: ' + theme,
+    'MEANING: This image illustrates: "' + text + '"',
+    'STYLE: epic, cinematic, futuristic, dramatic lighting, football hero moment.',
+    'Portrait 9:16 vertical, photorealistic, film grain.',
+    'No text, no watermarks.'
+  ];
+  if (state.customPrompt) parts.push('ADDITIONAL: ' + state.customPrompt);
+  return parts.join('\n');
+}
+
+async function generateImage(prompt) {
+  const body = { model: MODEL_IMAGE, prompt: prompt, n: 1, size: '1024x1792', response_format: 'url' };
+  const res = await apiFetch(API_BASE + '/images/generations', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + getApiKey(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }, 'Image');
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const item = data.data && data.data[0];
+  if (!item) throw new Error('Pas de donnée');
+  return item.url || ('data:image/png;base64,' + item.b64_json);
+}
+
+async function addTextToImage(imageUrl, text) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const W = 1080, H = 1920;
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(W / img.width, H / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+        const gradient = ctx.createLinearGradient(0, H - 600, 0, H);
+        gradient.addColorStop(0, 'rgba(0,0,0,0)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0.85)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, H - 600, W, 600);
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        let fontSize = 64;
+        ctx.font = '700 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif';
+        const maxWidth = W - 120;
+        const words = text.split(' ');
+        let lines = [], currentLine = '';
+        for (const word of words) {
+          const test = currentLine ? currentLine + ' ' + word : word;
+          if (ctx.measureText(test).width > maxWidth && currentLine) { lines.push(currentLine); currentLine = word; }
+          else currentLine = test;
+        }
+        if (currentLine) lines.push(currentLine);
+        if (lines.length > 4) {
+          fontSize = 48;
+          ctx.font = '700 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif';
+          lines = []; currentLine = '';
+          for (const word of words) {
+            const test = currentLine ? currentLine + ' ' + word : word;
+            if (ctx.measureText(test).width > maxWidth && currentLine) { lines.push(currentLine); currentLine = word; }
+            else currentLine = test;
+          }
+          if (currentLine) lines.push(currentLine);
+        }
+        const lineHeight = fontSize * 1.25;
+        const totalH = lines.length * lineHeight;
+        const startY = H - 250 - totalH / 2;
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetY = 4;
+        lines.forEach((line, i) => { ctx.fillText(line, W / 2, startY + i * lineHeight + lineHeight / 2); });
+        resolve(canvas.toDataURL('image/jpeg', 0.88));
+      } catch (e) { resolve(imageUrl); }
+    };
+    img.onerror = () => resolve(imageUrl);
+    img.src = imageUrl;
+  });
+}
+
+async function createVideoFromImages(imageUrls) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080; canvas.height = 1920;
+      const ctx = canvas.getContext('2d');
+      const stream = canvas.captureStream(30);
+      let mimeType = 'video/webm';
+      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType = 'video/webm;codecs=vp9';
+      else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) mimeType = 'video/webm;codecs=vp8';
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 });
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        resolve({ url: URL.createObjectURL(blob), blob, mimeType });
+      };
+      const loadedImages = await Promise.all(imageUrls.map(url => new Promise((res, rej) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => res(img);
+        img.onerror = () => rej(new Error('Image load failed'));
+        img.src = url;
+      })));
+      recorder.start();
+      const FPS = 30;
+      const totalFrames = loadedImages.length * SECONDS_PER_IMAGE * FPS;
+      for (let frame = 0; frame < totalFrames; frame++) {
+        const t = frame / FPS;
+        const idx = Math.min(Math.floor(t / SECONDS_PER_IMAGE), loadedImages.length - 1);
+        const img = loadedImages[idx];
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+        await new Promise(r => requestAnimationFrame(r));
+      }
+      recorder.stop();
+    } catch (e) { reject(e); }
+  });
+}
+
+function createRateLimitedQueue(maxConcurrent, minIntervalMs) {
+  let running = 0, lastStart = 0;
+  const queue = [];
+  let resolveIdle = null;
+  function tryNext() {
+    if (running >= maxConcurrent) return;
+    if (queue.length === 0) { if (running === 0 && resolveIdle) { resolveIdle(); resolveIdle = null; } return; }
+    const wait = Math.max(0, lastStart + minIntervalMs - Date.now());
+    if (wait > 0) { setTimeout(tryNext, wait); return; }
+    const task = queue.shift();
+    running++; lastStart = Date.now();
+    task().finally(() => { running--; setTimeout(tryNext, 0); });
+  }
+  return {
+    add(fn) { return new Promise((res, rej) => { queue.push(() => fn().then(res, rej)); setTimeout(tryNext, 0); }); },
+    idle() { return new Promise(r => { if (running === 0 && queue.length === 0) return r(); resolveIdle = r; }); }
+  };
+}
+
+function renderVibes() {
+  const grid = document.getElementById('vibe-grid');
+  if (!grid) return;
+  grid.innerHTML = VIBES.map(v =>
+    '<div class="vibe-card' + (state.selectedVibe === v.id ? ' selected' : '') + '" data-vibe="' + v.id + '">' +
+      '<div class="vibe-icon">' + v.icon + '</div>' +
+      '<div class="vibe-name">' + esc(v.name) + '</div>' +
+      '<div class="vibe-desc">' + esc(v.desc) + '</div>' +
+    '</div>'
+  ).join('');
+  grid.querySelectorAll('[data-vibe]').forEach(el => {
+    el.addEventListener('click', () => { state.selectedVibe = el.dataset.vibe; renderVibes(); });
+  });
+}
+
+function renderThemes() {
+  const grid = document.getElementById('theme-grid');
+  if (!grid) return;
+  grid.innerHTML = THEMES.map(t =>
+    '<div class="theme-card' + (state.selectedTheme === t.id && !state.customTheme ? ' selected' : '') + '" data-theme="' + t.id + '">' +
+      '<div class="theme-name">' + esc(t.name) + '</div>' +
+      '<div class="theme-desc">' + esc(t.desc) + '</div>' +
+    '</div>'
+  ).join('');
+  grid.querySelectorAll('[data-theme]').forEach(el => {
+    el.addEventListener('click', () => {
+      state.selectedTheme = el.dataset.theme;
+      state.customTheme = '';
+      document.getElementById('custom-theme').value = '';
+      renderThemes(); updateGenerateBtn();
+    });
+  });
+}
+
+function renderTextsList() {
+  const list = document.getElementById('texts-list');
+  const section = document.getElementById('section-texts');
+  if (!list) return;
+  if (!state.texts.length) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  section.classList.add('open');
+  list.innerHTML = state.texts.map((t, i) =>
+    '<div class="text-item"><span class="text-num">' + (i + 1) + '.</span><span class="text-content">' + esc(t) + '</span></div>'
+  ).join('');
+  document.getElementById('texts-count').textContent = state.texts.length;
+}
+
+function renderImagesGrid() {
+  const grid = document.getElementById('images-grid');
+  if (!grid) return;
+  grid.innerHTML = state.images.map((img, i) => {
+    if (img && img.url) {
+      return '<div class="image-card done"><img src="' + img.url + '" alt=""><div class="img-text">' + esc(state.texts[i] || '') + '</div></div>';
+    }
+    return '<div class="image-card loading">N° ' + (i + 1) + '</div>';
+  }).join('');
+  const countEl = document.getElementById('results-count');
+  if (countEl) countEl.textContent = state.images.filter(i => i && i.url).length;
+}
+
+function updateImageCard(index, url) {
+  const cards = document.querySelectorAll('.image-card');
+  if (!cards[index]) return;
+  cards[index].classList.remove('loading');
+  cards[index].classList.add('done');
+  cards[index].innerHTML = '<img src="' + url + '" alt=""><div class="img-text">' + esc(state.texts[index] || '') + '</div>';
+}
+
+function renderVideosGrid() {
+  const grid = document.getElementById('videos-grid');
+  const section = document.getElementById('section-videos');
+  if (!grid) return;
+  if (!state.videos.length) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  section.classList.add('open');
+  grid.innerHTML = state.videos.map((v, i) =>
+    '<div class="video-card">' +
+      '<video src="' + v.url + '" controls playsinline preload="metadata"></video>' +
+      '<div class="video-label">Vidéo ' + (i + 1) + '</div>' +
+      '<a class="video-download" href="' + v.url + '" download="futurfoot-' + (i + 1) + '.webm">⬇ Télécharger</a>' +
+    '</div>'
+  ).join('');
+  document.getElementById('videos-count').textContent = state.videos.length;
+}
+
+async function runBatch() {
+  if (state.isRunning) return;
+  if (!getApiKey()) { showToast('Ajoutez votre clé API', 'error'); return; }
+
+  state.isRunning = true;
+  state.stopRequested = false;
+  state.completed = 0;
+  state.failed = 0;
+  state.texts = [];
+  state.images = new Array(BATCH_SIZE).fill(null);
+
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('more-btn').classList.remove('visible');
+  document.getElementById('stop-btn').classList.add('visible');
+  document.getElementById('section-results').classList.remove('hidden');
+  document.getElementById('section-results').classList.add('open');
+  document.getElementById('section-texts').classList.add('hidden');
+  updateGenerateBtn();
+  renderImagesGrid();
+
+  await ensureWakeLockActive();
+
+  debugLog('state', 'START', '════════════════════════════════════════');
+  debugLog('state', 'START', 'Batch #' + (state.batchCount + 1));
+
+  try {
+    state.texts = await generateTexts();
+    renderTextsList();
+    debugLog('success', 'TEXTES', '5 textes OK');
+
+    setStatus('Génération des 5 images…');
+    const queue = createRateLimitedQueue(IMAGE_PARALLEL, IMAGE_INTERVAL_MS);
+    const tasks = [];
+    for (let i = 0; i < BATCH_SIZE; i++) {
+      const idx = i;
+      tasks.push(queue.add(async () => {
+        if (state.stopRequested) return;
+        try {
+          const prompt = buildImagePrompt(idx, state.texts[idx] || '');
+          const url = await generateImage(prompt);
+          const withText = await addTextToImage(url, state.texts[idx] || '');
+          state.images[idx] = { url: withText, originalUrl: url };
+          updateImageCard(idx, withText);
+          state.completed++;
+          setStatus('Images : ' + state.completed + ' / ' + BATCH_SIZE);
+        } catch (e) {
+          if (e.message !== 'Arrêt demandé') {
+            state.failed++;
+            debugLog('error', 'IMAGE ' + (idx + 1), e.message);
+          }
+        }
+      }));
+    }
+    await Promise.allSettled(tasks);
+    await queue.idle();
+
+    if (!state.stopRequested) {
+      setStatus('Création de la vidéo…');
+      const valid = state.images.filter(i => i && i.url).map(i => i.url);
+      if (valid.length > 0) {
+        try {
+          const result = await createVideoFromImages(valid);
+          state.videos.push(result);
+          renderVideosGrid();
+        } catch (e) { debugLog('error', 'VIDÉO', e.message); }
+      }
+    }
+
+    state.batchCount++;
+    const summary = '✦ ' + state.completed + ' images · ' + state.videos.length + ' vidéo(s) ✦';
+    debugLog('success', 'FIN', summary);
+    setStatus(summary);
+    showToast(summary, 'success', 4000);
+
+    if (!state.stopRequested) {
+      document.getElementById('more-btn').classList.add('visible');
+    }
+
+  } catch (e) {
+    debugLog('error', 'GLOBAL', e.message);
+    showToast('Erreur : ' + e.message.slice(0, 60), 'error');
+  }
+
+  state.isRunning = false;
+  state.stopRequested = false;
+  document.getElementById('stop-btn').classList.remove('visible');
+  updateGenerateBtn();
+  await deactivateWakeLock();
+  setTimeout(() => setStatus(null), 4000);
+}
+
+function stopGeneration() {
+  if (!state.isRunning) return;
+  state.stopRequested = true;
+  debugLog('warn', 'STOP', 'Arrêt demandé');
+  setStatus('Arrêt en cours…');
+}
+
+(function init() {
+  document.getElementById('api-save-btn').addEventListener('click', saveApiKey);
+  document.getElementById('api-key-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveApiKey(); } });
+
+  document.getElementById('api-paste-btn').addEventListener('click', async () => {
+    try {
+      let text = '';
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        text = await navigator.clipboard.readText();
+      } else {
+        const input = document.getElementById('api-key-input');
+        input.focus();
+        document.execCommand('paste');
+        text = input.value;
+      }
+      text = (text || '').trim();
+      if (!text) { showToast('Presse-papier vide', 'error'); return; }
+      if (!text.startsWith('sk-')) { showToast('Clé invalide', 'error'); return; }
+      document.getElementById('api-key-input').value = text;
+      localStorage.setItem('agnes_api_key', text);
+      updateApiPanel();
+      showToast('Clé enregistrée ✓ (' + text.length + ' caractères)', 'success');
+    } catch (e) { showToast('Erreur : ' + e.message, 'error'); }
+  });
+
+  document.querySelectorAll('[data-toggle]').forEach(header => {
+    header.addEventListener('click', () => { document.getElementById(header.dataset.toggle).classList.toggle('open'); });
+  });
+
+  renderVibes();
+  renderThemes();
+
+  document.getElementById('custom-theme').addEventListener('input', e => {
+    state.customTheme = e.target.value.trim();
+    if (state.customTheme) { state.selectedTheme = ''; renderThemes(); }
+    updateGenerateBtn();
+  });
+  document.getElementById('custom-prompt').addEventListener('input', e => { state.customPrompt = e.target.value; });
+
+  document.getElementById('generate-btn').addEventListener('click', runBatch);
+  document.getElementById('more-btn').addEventListener('click', runBatch);
+  document.getElementById('stop-btn').addEventListener('click', stopGeneration);
+  document.getElementById('wake-toggle-btn').addEventListener('click', toggleWakeLock);
+
+  document.getElementById('debug-header').addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') return; toggleDebugCollapse(); });
+  document.getElementById('debug-collapse-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleDebugCollapse(); });
+  document.getElementById('debug-clear-btn').addEventListener('click', (e) => { e.stopPropagation(); clearDebug(); });
+  document.getElementById('debug-copy-btn').addEventListener('click', (e) => { e.stopPropagation(); copyDebug(); });
+
+  try { wakeLockEnabled = localStorage.getItem(WAKE_LOCK_PREF) === '1'; } catch (e) {}
+  if (wakeLockEnabled) activateWakeLock().then(() => updateWakeStatus());
+
+  updateApiPanel();
+  updateWakeStatus();
+
+  debugLog('success', 'INIT', 'Futur Foot V1 prêt');
+  debugLog('info', 'INIT', 'Bouton actif dès que la clé est enregistrée');
+})();
+</script>
+</body>
+</html>
