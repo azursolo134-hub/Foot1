@@ -1,1 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Futur Foot Studio — Football 2100</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --night: #05070d; --night-2: #0d1119; --night-3: #161c28;
+  --panel: #10141f; --panel-2: #181e2c; --border: #222a3a; --border-soft: #1a2029;
+  --cyan: #00e0ff; --cyan-soft: #66eaff; --cyan-deep: #008fa8;
+  --magenta: #ff00a0; --magenta-soft: #ff66c0;
+  --electric: #00ff88; --electric-soft: #66ffb8;
+  --gold: #ffd700;
+  --ink: #e8f0ff; --ink-dim: #7a8aa5; --ink-faint: #3a4458;
+  --success: #00ff88; --error: #ff3b5c; --warn: #ffb020;
+  --radius: 8px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: 'Impact', 'Helvetica Neue', Arial, sans-serif;
+}
+body {
+  font-family: var(--font-sans); background: var(--night);
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(0,224,255,0.12) 0%, transparent 45%),
+    radial-gradient(circle at 85% 100%, rgba(255,0,160,0.10) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(0,255,136,0.04) 0%, transparent 60%);
+  background-attachment: fixed;
+  color: var(--ink); min-height: 100vh; padding: 1.5rem 1rem 20rem;
+  max-width: 900px; margin: 0 auto; font-size: 15px; line-height: 1.55;
+}
+header { text-align: center; margin-bottom: 1.8rem; }
+.studio-mark { display: inline-block; font-size: 0.7rem; letter-spacing: 0.4em; color: var(--cyan); text-transform: uppercase; margin-bottom: 0.6rem; font-weight: 700; }
+h1 { font-family: var(--font-display); font-size: 2.3rem; font-weight: 900; letter-spacing: 0.02em; margin-bottom: 0.4rem; text-transform: uppercase;
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--electric) 50%, var(--magenta) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 30px rgba(0,224,255,0.3); }
+.subtitle { font-size: 0.85rem; color: var(--ink-dim); letter-spacing: 0.1em; text-transform: uppercase; }
 
+.info-banner { background: linear-gradient(135deg, rgba(0,224,255,0.08), rgba(255,0,160,0.05)); border-left: 3px solid var(--cyan); border-radius: var(--radius); padding: 1rem 1.15rem; margin-bottom: 1rem; font-size: 0.78rem; color: var(--ink-dim); line-height: 1.6; }
+.info-banner strong { color: var(--ink); }
+.info-banner .hl-cyan { color: var(--cyan-soft); font-weight: 700; }
+.info-banner .hl-magenta { color: var(--magenta-soft); font-weight: 700; }
+
+.api-panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+.api-panel.ok { box-shadow: inset 3px 0 0 var(--electric), 0 0 20px rgba(0,255,136,0.1); }
+.api-key-input { width: 100%; padding: 0.8rem 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--night-2); color: var(--ink); font-family: var(--font-mono); font-size: 0.82rem; margin-bottom: 0.5rem; }
+.api-paste-btn { width: 100%; padding: 0.9rem; border-radius: var(--radius); border: 1px solid var(--electric); background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,255,136,0.1)); color: var(--electric-soft); font-weight: 800; cursor: pointer; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.82rem; }
+.api-save-btn { width: 100%; padding: 0.8rem; border-radius: var(--radius); border: 1px solid var(--cyan-deep); background: linear-gradient(135deg, rgba(0,224,255,0.15), rgba(0,224,255,0.05)); color: var(--cyan-soft); font-weight: 700; cursor: pointer; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.78rem; }
+.api-status-line { font-size: 0.75rem; padding: 0.5rem 0.8rem; border-radius: var(--radius); background: var(--night-2); color: var(--ink-dim); display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border-soft); }
+.api-status-line.ok { color: var(--electric); background: rgba(0,255,136,0.06); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
+.api-status-line.ok .status-dot { background: var(--electric); box-shadow: 0 0 8px var(--electric); }
+.api-hint { font-size: 0.7rem; color: var(--ink-dim); margin-top: 0.4rem; }
+.api-hint a { color: var(--cyan-soft); text-decoration: none; }
+.wake-status { font-size: 0.7rem; padding: 0.5rem 0.7rem; border-radius: var(--radius); margin-top: 0.4rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,224,255,0.06); color: var(--cyan-soft); border: 1px solid var(--cyan-deep); flex-wrap: wrap; gap: 0.4rem; }
+.wake-status.active { background: rgba(0,255,136,0.08); color: var(--electric); }
+.wake-status button { background: transparent; border: 1px solid currentColor; color: inherit; padding: 0.25rem 0.6rem; border-radius: var(--radius); font-size: 0.65rem; cursor: pointer; }
+
+.section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.9rem; overflow: hidden; }
+.section-header { padding: 0.95rem 1.15rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.18em; color: var(--ink); font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+.section-title .badge { font-size: 0.58rem; padding: 0.12rem 0.5rem; border: 1px solid var(--cyan-deep); border-radius: 2px; color: var(--cyan-soft); letter-spacing: 0.1em; font-weight: 700; }
+.section-title .badge.magenta { border-color: var(--magenta); color: var(--magenta-soft); }
+.section-title .badge.electric { border-color: var(--electric); color: var(--electric-soft); }
+.section-header .chevron { color: var(--ink-faint); font-size: 0.7rem; transition: all 0.3s; }
+.section.open .chevron { transform: rotate(180deg); color: var(--cyan); }
+.section-body { max-height: 0; overflow: hidden; transition: max-height 0.4s; }
+.section.open .section-body { max-height: 8000px; }
+.section-content { padding: 0 1.15rem 1.15rem; }
+
+.vibe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
+.vibe-card { padding: 0.75rem 0.7rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--night-2); cursor: pointer; text-align: center; transition: all 0.15s; }
+.vibe-card.selected { background: linear-gradient(135deg, rgba(0,224,255,0.15), rgba(255,0,160,0.1)); border-color: var(--cyan); color: var(--cyan-soft); box-shadow: 0 0 15px rgba(0,224,255,0.2); }
+.vibe-card .vibe-icon { font-size: 1.5rem; display: block; margin-bottom: 0.25rem; }
+.vibe-card .vibe-name { font-size: 0.72rem; font-weight: 700; line-height: 1.2; }
+.vibe-card .vibe-desc { font-size: 0.6rem; opacity: 0.6; margin-top: 0.15rem; }
+
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; margin-bottom: 0.8rem; }
+.theme-card { padding: 0.7rem 0.8rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--night-2); cursor: pointer; text-align: left; transition: all 0.15s; }
+.theme-card.selected { background: linear-gradient(135deg, rgba(255,0,160,0.12), rgba(0,224,255,0.08)); border-color: var(--magenta); color: var(--magenta-soft); box-shadow: 0 0 15px rgba(255,0,160,0.2); }
+.theme-card .theme-name { font-size: 0.72rem; font-weight: 700; }
+.theme-card .theme-desc { font-size: 0.6rem; opacity: 0.6; margin-top: 0.15rem; }
+
+.control-row { margin-bottom: 1rem; }
+.control-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--ink-dim); margin-bottom: 0.5rem; font-weight: 700; display: block; }
+select, textarea, input[type=text] { width: 100%; padding: 0.75rem 0.9rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--night-2); color: var(--ink); font-family: var(--font-sans); font-size: 0.85rem; -webkit-appearance: none; appearance: none; }
+select:focus, textarea:focus, input[type=text]:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,224,255,0.1); }
+
+.btn-primary { width: 100%; padding: 1.2rem; border-radius: var(--radius); border: 2px solid var(--cyan); background: linear-gradient(135deg, rgba(0,224,255,0.25), rgba(0,255,136,0.15), rgba(255,0,160,0.15)); color: #fff; font-size: 0.95rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; margin-bottom: 0.8rem; text-shadow: 0 0 10px rgba(0,224,255,0.5); transition: all 0.2s; }
+.btn-primary:active:not(:disabled) { transform: scale(0.98); box-shadow: 0 0 30px rgba(0,224,255,0.5); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-stop { width: 100%; padding: 0.85rem; border-radius: var(--radius); border: 1px solid var(--error); background: transparent; color: var(--error); font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; display: none; font-size: 0.82rem; margin-bottom: 0.8rem; }
+.btn-stop.visible { display: block; }
+.btn-more { width: 100%; padding: 1rem; border-radius: var(--radius); border: 2px solid var(--electric); background: linear-gradient(135deg, rgba(0,255,136,0.25), rgba(0,255,136,0.1)); color: var(--electric-soft); font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; font-size: 0.85rem; cursor: pointer; margin-bottom: 0.8rem; display: none; }
+.btn-more.visible { display: block; }
+
+.images-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.7rem; margin-top: 1rem; }
+.image-card { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--cyan-deep); background: var(--night-2); aspect-ratio: 9/16; position: relative; box-shadow: 0 0 15px rgba(0,224,255,0.15); }
+.image-card.loading { display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font-size: 0.62rem; font-family: var(--font-mono); }
+.image-card.loading::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(0,224,255,0.15) 50%, transparent 70%); animation: shimmer 1.6s linear infinite; }
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.image-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.image-card .img-text { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.6rem 0.5rem; background: linear-gradient(transparent, rgba(0,0,0,0.95)); font-size: 0.72rem; color: #fff; text-align: center; font-weight: 800; line-height: 1.3; text-shadow: 0 0 10px rgba(0,224,255,0.8), 0 2px 4px rgba(0,0,0,1); }
+
+.videos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.9rem; margin-top: 1rem; }
+.video-card { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--magenta); background: #000; box-shadow: 0 0 20px rgba(255,0,160,0.2); }
+.video-card video { width: 100%; display: block; aspect-ratio: 9/16; object-fit: cover; background: #000; }
+.video-card .video-label { padding: 0.5rem; background: var(--panel); font-size: 0.72rem; color: var(--magenta-soft); text-align: center; font-family: var(--font-mono); font-weight: 700; }
+.video-card .video-download { display: block; padding: 0.7rem; background: linear-gradient(135deg, var(--cyan), var(--magenta)); color: #fff; text-align: center; font-weight: 900; font-size: 0.78rem; text-decoration: none; text-transform: uppercase; letter-spacing: 0.15em; }
+
+.texts-list { background: var(--night-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.8rem; max-height: 300px; overflow-y: auto; }
+.text-item { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border-soft); font-size: 0.78rem; display: flex; gap: 0.5rem; align-items: flex-start; }
+.text-item:last-child { border-bottom: none; }
+.text-item .text-num { color: var(--cyan-soft); font-family: var(--font-mono); font-size: 0.7rem; flex-shrink: 0; font-weight: 700; }
+.text-item .text-content { flex: 1; }
+
+.status-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--night-3); border-top: 2px solid var(--cyan); padding: 0.85rem 1.1rem; display: flex; align-items: center; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink); transform: translateY(100%); transition: transform 0.35s; z-index: 100; box-shadow: 0 -4px 20px rgba(0,224,255,0.2); }
+.status-bar.visible { transform: translateY(0); }
+.spinner { width: 12px; height: 12px; border: 2px solid rgba(0,224,255,0.2); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast { position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%) translateY(-120px); background: var(--night-3); border: 1px solid var(--border); border-left: 3px solid var(--cyan); padding: 0.85rem 1.3rem; border-radius: var(--radius); font-size: 0.8rem; z-index: 1000; opacity: 0; transition: all 0.35s; max-width: 90vw; font-weight: 600; }
+.toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+.toast.success { border-left-color: var(--electric); }
+.toast.error { border-left-color: var(--error); }
+.toast.warn { border-left-color: var(--warn); }
+
+.debug-panel { position: fixed; bottom: 0; left: 0; right: 0; height: 200px; background: #020305; border-top: 2px solid var(--cyan); z-index: 200; display: flex; flex-direction: column; font-family: var(--font-mono); transition: height 0.3s; }
+.debug-panel.collapsed { height: 34px; }
+.debug-header { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.75rem; background: linear-gradient(90deg, #0a0f18, #141c28); border-bottom: 1px solid var(--border); cursor: pointer; flex-shrink: 0; }
+.debug-title { font-size: 0.65rem; color: var(--cyan); letter-spacing: 0.12em; font-weight: 700; text-transform: uppercase; }
+.debug-title .debug-badge { font-size: 0.58rem; padding: 0.1rem 0.4rem; background: var(--cyan); color: var(--night); border-radius: 2px; font-weight: 900; margin-left: 0.4rem; }
+.debug-actions { display: flex; gap: 0.25rem; }
+.debug-actions button { background: transparent; border: 1px solid var(--border); color: var(--ink-dim); font-size: 0.6rem; padding: 0.2rem 0.5rem; border-radius: 2px; cursor: pointer; }
+.debug-body { flex: 1; overflow-y: auto; padding: 0.4rem 0.65rem; font-size: 0.68rem; line-height: 1.45; color: #c8d0e0; }
+.debug-entry { margin-bottom: 0.25rem; padding: 0.15rem 0.35rem; border-left: 2px solid transparent; }
+.debug-entry.info { border-left-color: var(--ink-faint); }
+.debug-entry.success { border-left-color: var(--electric); }
+.debug-entry.warn { border-left-color: var(--warn); }
+.debug-entry.error { border-left-color: var(--error); }
+.debug-entry.api { border-left-color: var(--cyan); }
+.debug-time { color: var(--ink-faint); margin-right: 0.4rem; font-size: 0.6rem; }
+.debug-cat { color: var(--cyan-soft); font-weight: 700; margin-right: 0.35rem; }
+
+.hidden { display: none !important; }
+#noSleepCanvas { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; z-index: -1; }
+#noSleepVideo { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; z-index: -1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="studio-mark">⚡ Futur Foot ⚡ Studio ⚡</div>
+  <h1>Futur Foot</h1>
+  <p class="subtitle">Football 2100 · 5 images · 1 vidéo · Illimité</p>
+</header>
+
+<div class="info-banner">
+  <strong>Le studio du football futuriste.</strong> Choisissez une <strong class="hl-cyan">ambiance</strong> et un <strong class="hl-magenta">thème</strong>.
+  L'IA génère <strong class="hl-cyan">5 textes</strong> percutants, <strong class="hl-cyan">5 images</strong> spectaculaires et <strong class="hl-magenta">1 vidéo TikTok</strong> en ~2 minutes.
+  Relancez à l'infini avec le bouton <strong class="hl-cyan">+5</strong>.
+</div>
+
+<div class="api-panel" id="api-panel">
+  <input type="text" class="api-key-input" id="api-key-input" placeholder="Collez votre clé API Agnes (sk-...)" autocomplete="off" spellcheck="false">
+  <button type="button" class="api-paste-btn" id="api-paste-btn">📋 Coller la clé directement</button>
+  <button type="button" class="api-save-btn" id="api-save-btn">Enregistrer la clé</button>
+  <div class="api-status-line" id="api-status-line">
+    <span class="status-dot"></span>
+    <span id="api-status-text">Aucune clé API enregistrée</span>
+  </div>
+  <div class="api-hint">Clé gratuite sur <a href="https://platform.agnes-ai.com" target="_blank">platform.agnes-ai.com</a></div>
+  <div class="wake-status" id="wake-status">
+    <span id="wake-status-text">💤 Veille automatique</span>
+    <button type="button" id="wake-toggle-btn">Garder l'écran allumé</button>
+  </div>
+</div>
+
+<div class="section open" id="section-vibe">
+  <div class="section-header" data-toggle="section-vibe">
+    <span class="section-title">⚡ Ambiance visuelle <span class="badge">style</span></span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="section-body"><div class="section-content">
+    <div class="vibe-grid" id="vibe-grid"></div>
+  </div></div>
+</div>
+
+<div class="section open" id="section-theme">
+  <div class="section-header" data-toggle="section-theme">
+    <span class="section-title">🥅 Thème des textes <span class="badge magenta">IA</span></span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="section-body"><div class="section-content">
+    <div class="theme-grid" id="theme-grid"></div>
+    <div class="control-row">
+      <label class="control-label">Ou tapez votre propre thème</label>
+      <input type="text" id="custom-theme" placeholder="Ex : Buts spectaculaires à la 90e minute">
+    </div>
+    <div class="control-row">
+      <label class="control-label">Direction créative (optionnel)</label>
+      <textarea id="custom-prompt" placeholder="Ex : « Néons cyan et rose, ralenti, explosions de particules »"></textarea>
+    </div>
+  </div></div>
+</div>
+
+<button type="button" class="btn-primary" id="generate-btn" disabled>
+  ⚽ Lancer · 5 images + 1 vidéo
+</button>
+
+<button type="button" class="btn-more" id="more-btn">
+  ➕ Générer 5 de plus
+</button>
+
+<button type="button" class="btn-stop" id="stop-btn">
+  ⏹ Arrêter la génération
+</button>
+
+<div class="section hidden" id="section-texts">
+  <div class="section-header" data-toggle="section-texts">
+    <span class="section-title">✍️ Textes générés <span class="badge electric" id="texts-count">0</span></span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="section-body"><div class="section-content">
+    <div class="texts-list" id="texts-list"></div>
+  </div></div>
+</div>
+
+<div class="section hidden" id="section-results">
+  <div class="section-header" data-toggle="section-results">
+    <span class="section-title">🎞️ Vos images <span class="badge electric" id="results-count">0</span></span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="section-body"><div class="section-content">
+    <div class="images-grid" id="images-grid"></div>
+  </div></div>
+</div>
+
+<div class="section hidden" id="section-videos">
+  <div class="section-header" data-toggle="section-videos">
+    <span class="section-title">🎥 Vos vidéos TikTok <span class="badge magenta" id="videos-count">0</span></span>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="section-body"><div class="section-content">
+    <div class="videos-grid" id="videos-grid"></div>
+  </div></div>
+</div>
+
+<div class="status-bar" id="status-bar">
+  <div class="spinner"></div>
+  <span id="status-text">Préparation…</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="debug-panel" id="debug-panel">
+  <div class="debug-header" id="debug-header">
+    <div class="debug-title">🖥️ Console <span class="debug-badge" id="debug-count">0</span></div>
+    <div class="debug-actions">
+      <button type="button" id="debug-copy-btn">Copier</button>
+      <button type="button" id="debug-clear-btn">Effacer</button>
+      <button type="button" id="debug-collapse-btn">−</button>
+    </div>
+  </div>
+  <div class="debug-body" id="debug-body"></div>
+</div>
+
+<canvas id="noSleepCanvas" width="2" height="2"></canvas>
+<video id="noSleepVideo" playsinline muted loop></video>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════════════════
+const API_BASE = 'https://apihub.agnes-ai.com/v1';
+const MODEL_TEXT = 'agnes-2.5-flash';
+const MODEL_IMAGE = 'agnes-image-2.1-flash';
+const IMAGE_PARALLEL = 3;
+const IMAGE_INTERVAL_MS = 3400;
+const API_KEY_STORAGE = 'agnes_api_key_futurfoot';
+const WAKE_LOCK_PREF = 'futurfoot_wakelock';
+const BATCH_SIZE = 5;
+const SECONDS_PER_IMAGE = 2;
+
+// ══════════════════════════════════════════════════════════════════
+// AMBIANCES
+// ══════════════════════════════════════════════════════════════════
+const VIBES = [
+  { id: 'neon-stadium', icon: '⚡', name: 'Néon Stade', desc: 'Néons cyan et rose',
+    prompt: 'futuristic football stadium at night, electric cyan and magenta neon lights, glowing pitch lines, holographic scoreboard, cyber-sport atmosphere, blade runner aesthetic, dramatic cinematic lighting' },
+  { id: 'cyber-sport', icon: '🚀', name: 'Cyber Sport', desc: 'Armures high-tech',
+    prompt: 'cyber sport athletes in high-tech armor, LED visor helmets, holographic interfaces, energy trails, futuristic football gear, Tron-like aesthetic, neon glow' },
+  { id: 'future-city', icon: '🌃', name: 'Ville Futuriste', desc: 'Street foot en mégalopole',
+    prompt: 'futuristic street football in a cyberpunk megacity, neon signs, skyscrapers, wet asphalt reflections, holographic graffiti, urban energy' },
+  { id: 'giant-stadium', icon: '🏟️', name: 'Stade Géant', desc: 'Architecture monumentale',
+    prompt: 'monumental futuristic stadium, massive architecture, millions of holographic spectators, dramatic aerial view, epic scale, cinematic wide shots' },
+  { id: 'energy-goal', icon: '💥', name: 'But Lumineux', desc: 'Explosions de particules',
+    prompt: 'football goal with explosive light particles, energy trails from the ball, shockwave at impact, glow effect, holographic net, magical moment, dramatic slow motion' },
+  { id: 'cinema-sport', icon: '🎥', name: 'Cinéma Sport', desc: 'Ralenti dramatique',
+    prompt: 'cinematic sports cinematography, epic slow motion, dramatic lighting, film grain, professional sports photography aesthetic, hero moment' }
+];
+
+// ══════════════════════════════════════════════════════════════════
+// THÈMES
+// ══════════════════════════════════════════════════════════════════
+const THEMES = [
+  { id: 'goals', name: 'Buts Spectaculaires', desc: 'Volées, lucarnes, retournées',
+    prompt: 'spectacular football goals, bicycle kicks, volleys, top corner shots, impossible angles, goal scorer celebrating, ball hitting the net with explosive energy, crowd going wild' },
+  { id: 'dribbles', name: 'Dribbles Éclair', desc: 'Slaloms, passements',
+    prompt: 'lightning fast dribbles, slalom through defenders, nutmegs, stepovers, body feints, player gliding past opponents, technical mastery, futuristic speed' },
+  { id: 'celebrations', name: 'Célébrations', desc: 'Joie, équipe, trophée',
+    prompt: 'epic goal celebrations, players lifting trophies, team huddles, emotional moments, arms raised, holographic confetti, fireworks, championship glory' },
+  { id: 'action', name: 'Action Futuriste', desc: 'Cyber, tech, IA',
+    prompt: 'futuristic football action, AI-driven plays, holographic tactics, energy-enhanced shots, cybernetic athletes, high-tech sport, sci-fi football' },
+  { id: 'legends', name: 'Moments Légendaires', desc: 'Histoire du foot en 2100',
+    prompt: 'legendary football moments, iconic goals, historic saves, epic duels, the greatest players of 2100, mythological status, cinematic legends' },
+  { id: 'duels', name: 'Duels & Rivalités', desc: 'Un contre un, gardien contre attaquant',
+    prompt: 'intense football duels, striker vs goalkeeper, one-on-one battles, powerful tackles, dramatic saves, fierce determination, electric tension' }
+];
+
+// ══════════════════════════════════════════════════════════════════
+// ÉTAT
+// ══════════════════════════════════════════════════════════════════
+const state = {
+  isRunning: false,
+  stopRequested: false,
+  selectedVibe: 'neon-stadium',
+  selectedTheme: 'goals',
+  customTheme: '',
+  customPrompt: '',
+  texts: [],
+  images: [],
+  videos: [],
+  completed: 0,
